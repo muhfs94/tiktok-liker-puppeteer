@@ -4,35 +4,38 @@ const prompt = require('prompt');
 (async () => {
   // Fetch arguments from CLI
   const argv = require('minimist')(process.argv.slice(2));
+
+  // if using infinite pass --iteration=infinite args
   const { iteration = 5, uselogin = false } = argv;
 
   // Will prompt username and password if uselogin args is true
-  const credentials = await new Promise((resolve, reject) => {
-    const properties = [
-      {
-        name: 'username',
-      },
-      {
-        name: 'password',
-        hidden: true,
-      },
-    ];
+  const credentials = uselogin
+    ? await new Promise((resolve, reject) => {
+        const properties = [
+          {
+            name: 'username',
+          },
+          {
+            name: 'password',
+            hidden: true,
+          },
+        ];
 
-    prompt.start();
-    prompt.get(properties, function (err, result) {
-      if (err) {
-        reject(err);
-        console.log(err);
-        return 1;
-      }
-      resolve(result);
-    });
-  });
+        prompt.start();
+        prompt.get(properties, function (err, result) {
+          if (err) {
+            reject(err);
+            console.log(err);
+            return 1;
+          }
+          resolve(result);
+        });
+      })
+    : {};
 
   // General constants
   const tiktokUrl = 'http://www.tiktok.com';
-  const username = uselogin ? credentials.username : '';
-  const password = uselogin ? credentials.password : '';
+  const { username = '', password = '' } = credentials;
 
   // Selectors constants
   const homeLoginButton = 'button[data-e2e="top-login-button"';
@@ -70,7 +73,7 @@ const prompt = require('prompt');
 
   // set view port and open tiktok page
   page.setViewport({ width: 1280, height: 800, isMobile: false });
-  await page.goto(tiktokUrl);
+  await page.goto(tiktokUrl, { timeout: 0 });
 
   // Login flow
   if (username && password) {
@@ -80,14 +83,12 @@ const prompt = require('prompt');
     await page.type(inputEmailSelector, username);
     await page.type(inputPasswordSelector, password);
     await page.click(submitLoginSelector);
-    await page.waitForSelector(closeButtonSelector, { hidden: true });
-    // if ((await page.$x(dragThePuzzleXpath)) !== null) {
-    //   await waitForTimeout(120000);
-    // }
+    await page.waitForSelector(closeButtonSelector, { hidden: true, timeout: 0 });
   }
 
   // Begin the iteration of liking post
-  for (let i = 1; iteration === 'infinite' ? '' : i <= iteration; i++) {
+  let i = 1;
+  while (iteration === 'infinite' ? true : i <= iteration) {
     const listItemSelector = `div[data-e2e="recommend-list-item-container"]:nth-of-type(${i})`;
     const likeButton = `${listItemSelector} ${likeButtonSelector}`;
 
@@ -97,12 +98,13 @@ const prompt = require('prompt');
     await waitForTimeout(1000);
     if ((await page.$(closeButtonSelector)) !== null) {
       await page.click(closeButtonSelector);
-      await page.waitForSelector(closeButtonSelector, { hidden: true });
+      await page.waitForSelector(closeButtonSelector, { hidden: true, timeout: 0 });
     }
     await page.keyboard.press('ArrowDown');
 
     // A random delay to prevent activity being recognized as bot
     await waitForTimeout(randomDelayWithInterval(5, 7));
+    i++;
   }
   console.log('finished');
 })();
